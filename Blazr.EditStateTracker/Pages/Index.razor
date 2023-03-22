@@ -1,0 +1,38 @@
+﻿@page "/"
+
+<PageTitle>Index</PageTitle>
+<EditForm Model=this.model>
+    <EditStateTracker />
+    <div class="mb-3">
+        <label class="form-label">Date</label>
+        <InputDate class="form-control" @bind-Value=this.model.Date />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Temperature &deg;C</label>
+        <InputNumber class="form-control" @bind-Value=this.model.TemperatureC />
+    </div>
+    <div class="mb-3">
+        <label class="form-label">Summary</label>
+        <InputSelect class="form-select" @bind-Value=this.model.Summary>
+            @foreach (var summary in Summaries)
+            {
+                <option value="@summary">@summary</option>
+            }
+        </InputSelect>
+    </div>
+    <div class="mb-3 text-end">
+        <button type="submit" class="btn btn-primary">Submit</button>
+    </div>
+</EditForm>
+
+<div class="bg-dark text-white m-4 p-2">
+    <pre>Date : @this.model.Date</pre>
+    <pre>Temperature &deg;C : @this.model.TemperatureC</pre>
+    <pre>Summary: @this.model.Summary</pre>
+</div>
+
+@code {
+    private WeatherForecast model = new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
+
+    private List<string> Summaries = new() { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
+}
