@@ -2,36 +2,54 @@
 
 <PageTitle>Index</PageTitle>
 <EditForm Model=this.model>
-    <EditStateTracker />
+
+    <EditStateTracker @ref=_editStateTracker EditStateChange=this.OnEditStateChanged />
+
     <div class="mb-3">
         <label class="form-label">Date</label>
         <InputDate class="form-control" @bind-Value=this.model.Date />
     </div>
+
     <div class="mb-3">
         <label class="form-label">Temperature &deg;C</label>
         <InputNumber class="form-control" @bind-Value=this.model.TemperatureC />
     </div>
+
     <div class="mb-3">
         <label class="form-label">Summary</label>
         <InputSelect class="form-select" @bind-Value=this.model.Summary>
+            @if(this.model.Summary is null)
+            {
+                <option disabled selected value=""> -- Choose a Summary --</option>
+            }
             @foreach (var summary in Summaries)
             {
                 <option value="@summary">@summary</option>
             }
         </InputSelect>
     </div>
+
     <div class="mb-3 text-end">
-        <button type="submit" class="btn btn-primary">Submit</button>
+        <button disabled="@(!_isDirty)" type="button" class="btn btn-success">Submit</button>
+        <button disabled="@(_isDirty)" type="button" class="btn btn-dark">Exit</button>
     </div>
+
 </EditForm>
 
 <div class="bg-dark text-white m-4 p-2">
     <pre>Date : @this.model.Date</pre>
     <pre>Temperature &deg;C : @this.model.TemperatureC</pre>
     <pre>Summary: @this.model.Summary</pre>
+    <pre>State: @(_isDirty ? "Dirty" : "Clean")</pre>
 </div>
 
 @code {
+    private EditStateTracker? _editStateTracker;
+    private bool _isDirty;
+
+    private void OnEditStateChanged(bool isDirty)
+        => _isDirty = isDirty;
+
     private WeatherForecast model = new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
 
     private List<string> Summaries = new() { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };

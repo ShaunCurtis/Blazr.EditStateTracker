@@ -60,10 +60,11 @@ public class EditStateProperty
     {
         Name = name;
         BaseValue = value;
+        CurrentValue= value;
     }
 
     public void Set(object? value)
         => CurrentValue = value;
 
-    public bool IsDirty => BaseValue?.Equals(CurrentValue) ?? CurrentValue is not null;
+    public bool IsDirty => !BaseValue?.Equals(CurrentValue) ?? CurrentValue is not null;
 }

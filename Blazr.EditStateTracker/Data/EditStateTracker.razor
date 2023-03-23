@@ -1,0 +1,46 @@
+﻿@implements IDisposable
+
+@if(this.LockNavigation)
+{
+    <NavigationLock OnBeforeInternalNavigation=this.OnLocationChange ConfirmExternalNavigation=_isDirty />
+}
+
+@code {
+    [CascadingParameter] private EditContext _editContext { get; set; } = default!;
+    [Parameter] public bool LockNavigation { get; set; }
+    [Parameter] public EventCallback<bool> EditStateChange { get; set; }
+
+    private EditStateStore _store = default!;
+    private bool _currentIsDirty = false;
+    private bool _isDirty => _store.IsDirty();
+
+    public EditStateTracker() { }
+
+    protected override void OnInitialized()
+    {
+        ArgumentNullException.ThrowIfNull(_editContext);
+        _store = new(_editContext);
+        ArgumentNullException.ThrowIfNull(_store);
+        _editContext.OnFieldChanged += OnFieldChanged;
+    }
+
+    private void OnFieldChanged(object? sender, FieldChangedEventArgs e)
+    {
+        _store.Update(e);
+
+        if (_isDirty != _currentIsDirty)
+        {
+            _currentIsDirty = _isDirty;
+            this.EditStateChange.InvokeAsync(_isDirty);
+        }
+    }
+
+    private void OnLocationChange(LocationChangingContext context)
+    {
+        if (_isDirty)
+            context.PreventNavigation();
+    }
+
+    public void Dispose()
+        => _editContext.OnFieldChanged -= OnFieldChanged;
+}
