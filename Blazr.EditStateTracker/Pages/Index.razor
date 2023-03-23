@@ -1,9 +1,10 @@
 ﻿@page "/"
 
 <PageTitle>Index</PageTitle>
-<EditForm Model=this.model>
 
-    <EditStateTracker @ref=_editStateTracker EditStateChanged=this.OnEditStateChanged />
+<EditForm EditContext=_editContext>
+    <DataAnnotationsValidator />
+    <EditStateTracker @ref=_editStateTracker EditStateChanged=this.OnEditStateChanged LockNavigation=true />
 
     <div class="mb-3">
         <label class="form-label">Date</label>
@@ -18,7 +19,7 @@
     <div class="mb-3">
         <label class="form-label">Summary</label>
         <InputSelect class="form-select" @bind-Value=this.model.Summary>
-            @if(this.model.Summary is null)
+            @if (this.model.Summary is null)
             {
                 <option disabled selected value=""> -- Choose a Summary --</option>
             }
@@ -27,10 +28,11 @@
                 <option value="@summary">@summary</option>
             }
         </InputSelect>
+        <ValidationMessage For="() => this.model.Summary" />
     </div>
 
     <div class="mb-3 text-end">
-        <button disabled="@(!_isDirty)" type="button" class="btn btn-success">Submit</button>
+        <button disabled="@(!_isDirty)" type="button" class="btn btn-success" @onclick=this.SaveAsync>Submit</button>
         <button disabled="@(_isDirty)" type="button" class="btn btn-dark">Exit</button>
     </div>
 
@@ -46,11 +48,28 @@
 @code {
     private EditStateTracker? _editStateTracker;
     private bool _isDirty;
+    private WeatherForecast model = new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
+    private EditContext? _editContext;
+
+    protected override void OnInitialized()
+        => _editContext = new EditContext(model);
 
     private void OnEditStateChanged(bool isDirty)
         => _isDirty = isDirty;
 
-    private WeatherForecast model = new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
+    private async Task SaveAsync()
+    {
+        if (_editContext?.Validate() ?? false)
+        {
+            // mock an async call to the data pipeline to save the record
+            await Task.Delay(100);
+            // Error handling code here
+
+            // This will reset the edit context and the EditStateTracker
+            _editContext = new EditContext(model);
+            _isDirty = false;
+        }
+    }
 
     private List<string> Summaries = new() { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
 }

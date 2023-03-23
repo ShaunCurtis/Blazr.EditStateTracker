@@ -6,9 +6,13 @@ The standard `EditContext` doesn't track state properly.  It has no mechanism fo
 
 Note this tracks single layer objects.  This is a constraint of the `EditContext` itself.  If you want to track nested objects, you need to build your own `EditContext`.  *Another Repo to follow*.
 
-## How EditContext currently works
+What it looks like.  This screenshot shows a dirty invalid form where I've clicked on the browser refresh button.
 
-`EditContext` maintains a dictionary of *Edit States* defined as `FieldIdentifier`/`FieldState` pairs.
+![Dirty Screenshot](./images/locked-dirty-editor.png)
+
+## How EditContext Currently Works
+
+`EditContext` maintains an internal dictionary of *Edit States* defined as `FieldIdentifier`/`FieldState` pairs.
 
 `FieldIdentifier` is defined as:
 
@@ -40,19 +44,38 @@ public void NotifyFieldChanged(in FieldIdentifier fieldIdentifier)
     GetOrAddFieldState(fieldIdentifier).IsModified = true;
     OnFieldChanged?.Invoke(this, new FieldChangedEventArgs(fieldIdentifier));
 }
+
+internal FieldState GetOrAddFieldState(in FieldIdentifier fieldIdentifier)
+{
+    if (!_fieldStates.TryGetValue(fieldIdentifier, out var state))
+    {
+        state = new FieldState(fieldIdentifier);
+        _fieldStates.Add(fieldIdentifier, state);
+    }
+
+    return state;
+}
+
 ```
 
 ## Implementation
 
+The implementation consists of four objects:
+
+1. `TrackStateAttribute` - a custom attribute to identify properties to track.
+2. `EditStateProperty` - a class to hold state data for a property.
+3. `EditStateStore` - a collection class to hold the tracked `EditContext.Model` true state.
+4. `EditStateTracker` - a component to embed in `EditForm` that wires everything up.
+
 ### TrackState
 
-A custom attribute to identify properties that we want to track.
+A custom attribute to identify tracked properties.
 
 ```csharp
 public class TrackStateAttribute : Attribute {}
 ```
 
-Which we can now apply to `WeatherForecast`:
+Appied to `WeatherForecast`:
 
 ```csharp
 public class WeatherForecast
@@ -60,13 +83,13 @@ public class WeatherForecast
     [TrackState] public DateOnly Date { get; set; }
     [TrackState] public int TemperatureC { get; set; }
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-    [TrackState] public string? Summary { get; set; }
+    [TrackState] [Required] public string? Summary { get; set; }
 }
 ```
 
 ### EditStateProperty
 
-`EditStateProperty` tracks individual properties and the state of the property.
+An `EditStateProperty` tracks the state of individual properties.
 
 ```csharp
 public class EditStateProperty
@@ -91,11 +114,11 @@ public class EditStateProperty
 
 ### EditStateStore
 
-`EditStateStore` is the collection object that maintains the property state list.  The class gets the `EditContext` in the CTor and uses the `Model` as the object to track.  It gets all the properties to track and builds a list of `EditStateProperty` objects.
+`EditStateStore` is the collection object that maintains the property state list.  The class gets the `EditContext` in the CTor and tracks  `EditContext.Model`.  It obtains the trackable properties through reflection and builds a list of `EditStateProperty` objects.
 
-`Update` updates the property values and sorts the field state on the `EditContext`.
+`Update` updates the property values and manages the true field state on `EditContext`.
 
-`IsDirty` provides state for the object or an individual property. 
+`IsDirty` provides the object or an individual property state. 
 
 ```csharp
 public class EditStateStore
@@ -148,18 +171,18 @@ public class EditStateStore
 
 ### EditStateTracker
 
-Finally we need a component to plug everything together in the `EditForm`.
+Finally a component to plug everything together in the `EditForm`.
 
 The component:
 1. Captures the `EditContext`.
 2. Creates an `EditStateStore`.
 3. Hooks up a handler to the `OnFieldChanged` event of `EditContext`.
 
-`OnFieldChanged` calls `Update` on the store and if the edit state has changed invokes the `EditStateChanged` callback.
+`OnFieldChanged` calls `Update` on the store, and if the edit state has changed invokes `EditStateChanged`.
 
-The component implements Navigation locking if enabled by `LockNavigation`.  The UI adds the `NavigationLock` component and wires it up.
+`LockNavigation` enables/disables navigation locking.  The UI adds the `NavigationLock` component and wires it up if required.
 
-`OnLocationChanged` is the event handler for the component and prevents navigation when the form is dirty.
+`OnLocationChanged` is the callback handler for `NavigationLock` and prevents navigation when the form is dirty.
 
 ```csharp
 @implements IDisposable
@@ -216,14 +239,17 @@ This is a very standard edit form.  Note:
 
 1. The `EditStateTracker` component added to the `EditForm`.
 2. Tracking edit state through  `EditStateChanged` on `EditStateTracker` and using it to change the state of the buttons.
+3. Validation is included to show it works.
+4. There's a mock save to demostrate how to implement it.
 
 ```html
 @page "/"
 
 <PageTitle>Index</PageTitle>
-<EditForm Model=this.model>
 
-    <EditStateTracker @ref=_editStateTracker EditStateChanged=this.OnEditStateChanged />
+<EditForm EditContext=_editContext>
+    <DataAnnotationsValidator />
+    <EditStateTracker @ref=_editStateTracker EditStateChanged=this.OnEditStateChanged LockNavigation=true />
 
     <div class="mb-3">
         <label class="form-label">Date</label>
@@ -238,7 +264,7 @@ This is a very standard edit form.  Note:
     <div class="mb-3">
         <label class="form-label">Summary</label>
         <InputSelect class="form-select" @bind-Value=this.model.Summary>
-            @if(this.model.Summary is null)
+            @if (this.model.Summary is null)
             {
                 <option disabled selected value=""> -- Choose a Summary --</option>
             }
@@ -247,10 +273,11 @@ This is a very standard edit form.  Note:
                 <option value="@summary">@summary</option>
             }
         </InputSelect>
+        <ValidationMessage For="() => this.model.Summary" />
     </div>
 
     <div class="mb-3 text-end">
-        <button disabled="@(!_isDirty)" type="button" class="btn btn-success">Submit</button>
+        <button disabled="@(!_isDirty)" type="button" class="btn btn-success" @onclick=this.SaveAsync>Submit</button>
         <button disabled="@(_isDirty)" type="button" class="btn btn-dark">Exit</button>
     </div>
 
@@ -262,17 +289,49 @@ This is a very standard edit form.  Note:
     <pre>Summary: @this.model.Summary</pre>
     <pre>State: @(_isDirty ? "Dirty" : "Clean")</pre>
 </div>
-```
-```csharp
+
 @code {
     private EditStateTracker? _editStateTracker;
     private bool _isDirty;
+    private WeatherForecast model = new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
+    private EditContext? _editContext;
+
+    protected override void OnInitialized()
+        => _editContext = new EditContext(model);
 
     private void OnEditStateChanged(bool isDirty)
         => _isDirty = isDirty;
 
-    private WeatherForecast model = new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
+    private async Task SaveAsync()
+    {
+        if (_editContext?.Validate() ?? false)
+        {
+            // mock an async call to the data pipeline to save the record
+            await Task.Delay(100);
+            // Error handling code here
+
+            // This will reset the edit context and the EditStateTracker
+            _editContext = new EditContext(model);
+            _isDirty = false;
+        }
+    }
 
     private List<string> Summaries = new() { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };
+}
+```
 
+### Refreshing/Resetting the Edit Context and State
+
+There is no mechanism for refreshing or resetting the state because `EditContext` has no mechanism to do so.
+
+In the form `SaveAsync` creates a new `EditContext` based on the saved model.  `EditForm` detects the new `EditContext`, and forces the Renderer to destroy the old components and rebuild it's content.
+
+
+## Why `EditContext` is simple object based
+
+`EditContext` builds it's `FieldIdentifier` objects like this: the `model` is always `EditContext.Model`.  You can't add field identifiers to the state for child objects in `Model`.
+
+```csharp
+    public FieldIdentifier Field(string fieldName)
+        => new FieldIdentifier(this.Model, fieldName);
 ```
