@@ -2,13 +2,13 @@
 
 @if(this.LockNavigation)
 {
-    <NavigationLock OnBeforeInternalNavigation=this.OnLocationChange ConfirmExternalNavigation=_isDirty />
+    <NavigationLock OnBeforeInternalNavigation=this.OnLocationChanged ConfirmExternalNavigation=_isDirty />
 }
 
 @code {
     [CascadingParameter] private EditContext _editContext { get; set; } = default!;
     [Parameter] public bool LockNavigation { get; set; }
-    [Parameter] public EventCallback<bool> EditStateChange { get; set; }
+    [Parameter] public EventCallback<bool> EditStateChanged { get; set; }
 
     private EditStateStore _store = default!;
     private bool _currentIsDirty = false;
@@ -31,11 +31,11 @@
         if (_isDirty != _currentIsDirty)
         {
             _currentIsDirty = _isDirty;
-            this.EditStateChange.InvokeAsync(_isDirty);
+            this.EditStateChanged.InvokeAsync(_isDirty);
         }
     }
 
-    private void OnLocationChange(LocationChangingContext context)
+    private void OnLocationChanged(LocationChangingContext context)
     {
         if (_isDirty)
             context.PreventNavigation();
