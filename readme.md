@@ -1,4 +1,4 @@
-# Creating A Blazor Edit State Tracker
+# Building A Blazor Edit State Tracker
 
 `EditContext` has no mechanism to store the initial state of model properties, and therefore doesn't track true state.  It simply registers that a value in a `InputBase` field has changed.  The value could change back to it's original and `EditContext` would still register it as modified.
 
