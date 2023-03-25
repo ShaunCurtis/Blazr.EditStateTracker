@@ -4,13 +4,17 @@
 
 This article demonstrates how to build an Edit State tracker for the Blazor `EditContext`.
 
-> Note: this implementation only tracks flat single layer objects.  If you want to track nested objects, you need to build your own `EditContext`.
+> Note: this implementation only tracks flat single layer objects.  If you want to track nested objects, you need to build your own edit context.
 
 The screenshot below shows a dirty invalid form where I've clicked on the browser refresh button to try and exit the dirty form.
 
 ![Dirty Screenshot](./images/locked-dirty-editor.png)
 
-## How EditContext Currently Works
+## Code Repository
+
+You can find the code here [Blazr.EditStateTracker](https://github.com/ShaunCurtis/Blazr.EditStateTracker) in a Blazor Server application.
+
+## How EditContext and InputBase components Interact
 
 `EditContext` maintains an internal dictionary of *Edit States* defined as `FieldIdentifier`/`FieldState` pairs.
 
@@ -73,7 +77,7 @@ protected string CssClass
 }
 ```
 
-The `FieldCssClass` method is an extendion method defined in `EditContextFieldClassExtensions`
+The `FieldCssClass` extention method defined in `EditContextFieldClassExtensions`
 
 ```csharp
 public static string FieldCssClass(this EditContext editContext, in FieldIdentifier fieldIdentifier)
@@ -86,7 +90,7 @@ public static string FieldCssClass(this EditContext editContext, in FieldIdentif
 }
 ```
 
-And the default `FieldCssClassProvider` provider
+And the default `FieldCssClassProvider` provider.
 
 ```csharp
 public class FieldCssClassProvider
@@ -115,17 +119,17 @@ The implementation consists of four objects:
 1. `TrackStateAttribute` - a custom attribute to identify properties to track.
 2. `EditStateProperty` - a class to hold state data for a property.
 3. `EditStateStore` - a collection class to hold the tracked `EditContext.Model` true state.
-4. `EditStateTracker` - a component to embed in `EditForm` that wires everything up.
+4. `EditStateTracker` - a component to embed in `EditForm` that wires everything up and sorts inconsistencies in `EditContext`.
 
 ### TrackState
 
-A custom attribute to identify tracked properties.
+The custom attribute to identify tracked properties.  It does nothing more that identifies the properties to track.
 
 ```csharp
 public class TrackStateAttribute : Attribute {}
 ```
 
-Appied to `WeatherForecast`:
+Applied to `WeatherForecast`:
 
 ```csharp
 public class WeatherForecast
@@ -139,7 +143,7 @@ public class WeatherForecast
 
 ### EditStateProperty
 
-An `EditStateProperty` tracks the state of individual properties.
+`EditStateProperty` tracks the state of individual properties.
 
 ```csharp
 public class EditStateProperty
@@ -164,7 +168,7 @@ public class EditStateProperty
 
 ### EditStateStore
 
-`EditStateStore` is the collection object that maintains the property state list.  The class gets the `EditContext` in the CTor and tracks  `EditContext.Model`.  It obtains the trackable properties through reflection and builds a list of `EditStateProperty` objects.
+`EditStateStore` is the collection object that maintains the property state list.  The class requires the `EditContext` in *ctor* and tracks  `EditContext.Model`.  It obtains the trackable properties through reflection and builds a list of `EditStateProperty` objects.
 
 `Update` updates the property values and manages the true field state on `EditContext`.
 
@@ -221,7 +225,7 @@ public class EditStateStore
 
 ### EditStateTracker
 
-Finally a component to plug everything together in the `EditForm`.
+`EditStateTracker` is a component that plugs everything together in `EditForm`.
 
 The component:
 1. Captures the `EditContext`.
@@ -372,16 +376,33 @@ This is a very standard edit form.  Note:
 
 ### Refreshing/Resetting the Edit Context and State
 
-There is no mechanism for refreshing or resetting the state because `EditContext` has no mechanism to do so.
+There is no mechanism for refreshing or resetting the state because `EditContext` has no mechanism to reset itself.
 
 In the form `SaveAsync` creates a new `EditContext` based on the saved model.  `EditForm` detects the new `EditContext`, and forces the Renderer to destroy the old components and rebuild it's content.
 
-
-## Why `EditContext` is simple object based
-
-`EditContext` builds it's `FieldIdentifier` objects like this: the `model` is always `EditContext.Model`.  You can't add field identifiers to the state for child objects in `Model`.
+Here's the relevant code from `EditForm`.
 
 ```csharp
-    public FieldIdentifier Field(string fieldName)
-        => new FieldIdentifier(this.Model, fieldName);
+protected override void BuildRenderTree(RenderTreeBuilder builder)
+    {
+        Debug.Assert(_editContext != null);
+
+        // If _editContext changes, tear down and recreate all descendants.
+        // This is so we can safely use the IsFixed optimization on CascadingValue,
+        // optimizing for the common case where _editContext never changes.
+        builder.OpenRegion(_editContext.GetHashCode());
+
+        builder.OpenElement(0, "form");
+        builder.AddMultipleAttributes(1, AdditionalAttributes);
+        builder.AddAttribute(2, "onsubmit", _handleSubmitDelegate);
+        builder.OpenComponent<CascadingValue<EditContext>>(3);
+        builder.AddComponentParameter(4, "IsFixed", true);
+        builder.AddComponentParameter(5, "Value", _editContext);
+        builder.AddComponentParameter(6, "ChildContent", ChildContent?.Invoke(_editContext));
+        builder.CloseComponent();
+        builder.CloseElement();
+
+        builder.CloseRegion();
+    }
 ```
+
