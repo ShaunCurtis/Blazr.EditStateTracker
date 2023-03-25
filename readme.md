@@ -1,12 +1,12 @@
 # Creating A Blazor Edit State Tracker
 
-This repository shows how to build a simple Edit State Tracker for the Blazor `EditContext`.
+`EditContext` has no mechanism to store the initial state of model properties, and therefore doesn't track true state.  It simply registers that a value in a `InputBase` field has changed.  The value could change back to it's original and `EditContext` would still register it as modified.
 
-The standard `EditContext` doesn't track state properly.  It has no mechanism for storing the initial state.  It simply registers that a value in a `InputBase` field has changed.  The value could change back to it's original and `EditContext` would still register it as modified.
+This article demonstrates how to build an Edit State tracker for the Blazor `EditContext`.
 
-Note this tracks single layer objects.  This is a constraint of the `EditContext` itself.  If you want to track nested objects, you need to build your own `EditContext`.  *Another Repo to follow*.
+> Note: this implementation only tracks flat single layer objects.  If you want to track nested objects, you need to build your own `EditContext`.
 
-What it looks like.  This screenshot shows a dirty invalid form where I've clicked on the browser refresh button.
+The screenshot below shows a dirty invalid form where I've clicked on the browser refresh button to try and exit the dirty form.
 
 ![Dirty Screenshot](./images/locked-dirty-editor.png)
 
@@ -34,7 +34,7 @@ internal sealed class FieldState
 }
 ``` 
 
-All `InputBase` controls call `EditContext.NotifyFieldChanged`.  It adds an entry into the Edit States Dictionary and raises the `OnFieldChanged` event.
+All `InputBase` controls call `EditContext.NotifyFieldChanged` when they update.  `NotifyFieldChanged` adds or updates an entry in the Edit State dictionary, and raises the `OnFieldChanged` event.
 
 ```csharp
 public event EventHandler<FieldChangedEventArgs>? OnFieldChanged;
@@ -56,6 +56,56 @@ internal FieldState GetOrAddFieldState(in FieldIdentifier fieldIdentifier)
     return state;
 }
 
+```
+
+Field state is used by the `InputBase` components through some rather complicated Css Provider code to get the css formatting to the component.  *Green* for modified and valid, *Red* for invalid.  The code snippets from the various classes are shown below for reference.
+
+The code that gets the Css for `InputBase`.
+
+```caharp
+protected string CssClass
+{
+    get
+    {
+        var fieldClass = EditContext?.FieldCssClass(FieldIdentifier);
+        return AttributeUtilities.CombineClassNames(AdditionalAttributes, fieldClass) ?? string.Empty;
+    }
+}
+```
+
+The `FieldCssClass` method is an extendion method defined in `EditContextFieldClassExtensions`
+
+```csharp
+public static string FieldCssClass(this EditContext editContext, in FieldIdentifier fieldIdentifier)
+{
+    var provider = editContext.Properties.TryGetValue(FieldCssClassProviderKey, out var customProvider)
+        ? (FieldCssClassProvider)customProvider
+        : FieldCssClassProvider.Instance;
+
+    return provider.GetFieldCssClass(editContext, fieldIdentifier);
+}
+```
+
+And the default `FieldCssClassProvider` provider
+
+```csharp
+public class FieldCssClassProvider
+{
+    internal static readonly FieldCssClassProvider Instance = new FieldCssClassProvider();
+
+    public virtual string GetFieldCssClass(EditContext editContext, in FieldIdentifier fieldIdentifier)
+    {
+        var isValid = !editContext.GetValidationMessages(fieldIdentifier).Any();
+        if (editContext.IsModified(fieldIdentifier))
+        {
+            return isValid ? "modified valid" : "modified invalid";
+        }
+        else
+        {
+            return isValid ? "valid" : "invalid";
+        }
+    }
+}
 ```
 
 ## Implementation
