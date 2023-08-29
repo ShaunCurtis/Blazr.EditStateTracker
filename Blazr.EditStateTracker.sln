@@ -3,12 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.33502.453
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.EditStateTracker", "Blazr.EditStateTracker\Blazr.EditStateTracker.csproj", "{00DA8981-53BB-44A9-9711-C16C5F5218D3}"
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9A63A41E-A493-4959-A160-0F29927F07E3}"
 	ProjectSection(SolutionItems) = preProject
 		readme.md = readme.md
 	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libraries", "Libraries", "{92F8C607-3593-4833-965E-98ABC672510E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Deployments", "Deployments", "{3FB9FDE4-0B81-452C-ABB6-D75779F310BB}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.Server.Web", "Source\Deployments\Blazr.Server.Web\Blazr.Server.Web.csproj", "{6EC8F03C-3BC5-48E7-8D05-FD7AF2BC1716}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazr.EditStateTracker", "source\libraries\Blazr.EditStateTracker\Blazr.EditStateTracker.csproj", "{D7DB2B99-33F8-4AEA-8D62-2FBB58298FDA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,13 +22,21 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{00DA8981-53BB-44A9-9711-C16C5F5218D3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{00DA8981-53BB-44A9-9711-C16C5F5218D3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{00DA8981-53BB-44A9-9711-C16C5F5218D3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{00DA8981-53BB-44A9-9711-C16C5F5218D3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6EC8F03C-3BC5-48E7-8D05-FD7AF2BC1716}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6EC8F03C-3BC5-48E7-8D05-FD7AF2BC1716}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6EC8F03C-3BC5-48E7-8D05-FD7AF2BC1716}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6EC8F03C-3BC5-48E7-8D05-FD7AF2BC1716}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D7DB2B99-33F8-4AEA-8D62-2FBB58298FDA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D7DB2B99-33F8-4AEA-8D62-2FBB58298FDA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7DB2B99-33F8-4AEA-8D62-2FBB58298FDA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D7DB2B99-33F8-4AEA-8D62-2FBB58298FDA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{6EC8F03C-3BC5-48E7-8D05-FD7AF2BC1716} = {3FB9FDE4-0B81-452C-ABB6-D75779F310BB}
+		{D7DB2B99-33F8-4AEA-8D62-2FBB58298FDA} = {92F8C607-3593-4833-965E-98ABC672510E}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {68903661-B9AA-47E4-9605-5CD96DBF1D5D}

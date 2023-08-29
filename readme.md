@@ -114,12 +114,15 @@ public class FieldCssClassProvider
 
 ## Implementation
 
-The implementation consists of four objects:
+The implementation consists of three objects:
+
+1. `EditStateProperty` - a class to hold state data for a property.
+2. `BlazrEditStateStore` - a collection class to hold the tracked `EditContext.Model` true state.
+3. `BlazrEditStateTracker` - a component to embed in `EditForm` that wires everything up and sorts inconsistencies in `EditContext`.
+
+A fourth object is implemented in the *Blazr.Core* library.
 
 1. `TrackStateAttribute` - a custom attribute to identify properties to track.
-2. `EditStateProperty` - a class to hold state data for a property.
-3. `EditStateStore` - a collection class to hold the tracked `EditContext.Model` true state.
-4. `EditStateTracker` - a component to embed in `EditForm` that wires everything up and sorts inconsistencies in `EditContext`.
 
 ### TrackState
 
@@ -141,9 +144,9 @@ public class WeatherForecast
 }
 ```
 
-### EditStateProperty
+### BlazrEditStateProperty
 
-`EditStateProperty` tracks the state of individual properties.
+`BlazrEditStateProperty` tracks the state of individual properties.
 
 ```csharp
 public class EditStateProperty
@@ -162,27 +165,30 @@ public class EditStateProperty
     public void Set(object? value)
         => CurrentValue = value;
 
+    public void Reset()
+    => CurrentValue = this.BaseValue;
+
     public bool IsDirty => !BaseValue?.Equals(CurrentValue) ?? CurrentValue is not null;
 }
 ```
 
-### EditStateStore
+### BlazrEditStateStore
 
-`EditStateStore` is the collection object that maintains the property state list.  The class requires the `EditContext` in *ctor* and tracks  `EditContext.Model`.  It obtains the trackable properties through reflection and builds a list of `EditStateProperty` objects.
+`BlazrEditStateStore` is the collection object that maintains the property state list.  The class requires the `EditContext` in *ctor* and tracks  `EditContext.Model`.  It obtains the trackable properties through reflection and builds a list of `BlazrEditStateProperty` objects.
 
 `Update` updates the property values and manages the true field state on `EditContext`.
 
 `IsDirty` provides the object or an individual property state. 
 
 ```csharp
-public class EditStateStore
+public class BlazrEditStateStore
 {
     private object _model = new();
 
     private List<EditStateProperty> _properties = new();
     private EditContext _editContext;
 
-    public EditStateStore(EditContext context)
+    public BlazrEditStateStore(EditContext context)
     {
         _editContext = context;
         _model = context.Model;
@@ -215,22 +221,32 @@ public class EditStateStore
         }
     }
 
+    public void Reset()
+    {
+        foreach (var prop in _properties)
+        {
+            prop.Reset();
+            _editContext.MarkAsUnmodified(new(_editContext, prop.Name));
+        }
+    }
+
     public bool IsDirty(string fieldName)
         => _properties.FirstOrDefault(item => item.Name.Equals(fieldName))?.IsDirty ?? false;
-    
+
     public bool IsDirty()
         => _properties.Any(item => item.IsDirty);
 }
 ```
 
-### EditStateTracker
+### BlazrEditStateTracker
 
-`EditStateTracker` is a component that plugs everything together in `EditForm`.
+`BlazrEditStateTracker` is a component that plugs everything together in `EditForm`.
 
 The component:
 1. Captures the `EditContext`.
-2. Creates an `EditStateStore`.
+2. Creates an `BlazrEditStateStore`.
 3. Hooks up a handler to the `OnFieldChanged` event of `EditContext`.
+4. Adds a `BlazrEditStateStore` instance reference to the `EditContext.Properties` collection.
 
 `OnFieldChanged` calls `Update` on the store, and if the edit state has changed invokes `EditStateChanged`.
 
@@ -238,10 +254,14 @@ The component:
 
 `OnLocationChanged` is the callback handler for `NavigationLock` and prevents navigation when the form is dirty.
 
-```csharp
-@implements IDisposable
+> Note: `BlazrEditStateTracker` inherits from `BlazrControlBase`.  This component is part of the `Blazr.BaseComponents` Nuget library.
 
-@if(this.LockNavigation)
+```csharp
+@inherits BlazrControlBase
+@implements IDisposable
+@using Blazr.BaseComponents;
+
+@if (this.LockNavigation)
 {
     <NavigationLock OnBeforeInternalNavigation=this.OnLocationChanged ConfirmExternalNavigation=_isDirty />
 }
@@ -251,18 +271,27 @@ The component:
     [Parameter] public bool LockNavigation { get; set; }
     [Parameter] public EventCallback<bool> EditStateChanged { get; set; }
 
-    private EditStateStore _store = default!;
+    public const string EditStateStoreName = "EditStateStore";
+
+    private BlazrEditStateStore _store = default!;
     private bool _currentIsDirty = false;
     private bool _isDirty => _store.IsDirty();
 
-    public EditStateTracker() { }
-
-    protected override void OnInitialized()
+    protected override Task OnParametersSetAsync()
     {
-        ArgumentNullException.ThrowIfNull(_editContext);
-        _store = new(_editContext);
-        ArgumentNullException.ThrowIfNull(_store);
-        _editContext.OnFieldChanged += OnFieldChanged;
+        if(this.NotInitialized)
+        {
+            ArgumentNullException.ThrowIfNull(_editContext);
+
+            _store = new(_editContext);
+            ArgumentNullException.ThrowIfNull(_store);
+
+            _editContext.Properties[EditStateStoreName] = _store;
+            _editContext.OnFieldChanged += OnFieldChanged;
+
+        }
+
+        return Task.CompletedTask;
     }
 
     private void OnFieldChanged(object? sender, FieldChangedEventArgs e)
@@ -274,6 +303,7 @@ The component:
             _currentIsDirty = _isDirty;
             this.EditStateChanged.InvokeAsync(_isDirty);
         }
+        this.StateHasChanged();
     }
 
     private void OnLocationChanged(LocationChangingContext context)
@@ -287,23 +317,85 @@ The component:
 }
 ```
 
+### BlazrEditContextExtensions
+
+The `BlazrEditStateTracker` registers the instance of the `BlazrEditStateStore` with the `EditContext`.  This can be accessed directly through the `EditContext` by a set of `EditContext` extension methods provided in the namespace.
+
+```csharp
+public static class BlazrEditContextExtensions
+{
+    public const string EditStateStoreName = "EditStateStore";
+
+    public static bool GetEditState(this EditContext editContext)
+    {
+        BlazrEditStateStore? store = null;
+        if (editContext.Properties.TryGetValue(EditStateStoreName, out object? value))
+            store = value as BlazrEditStateStore;
+
+        return store?.IsDirty() ?? false;
+    }
+
+    public static BlazrEditStateStore? GetStateStore(this EditContext editContext)
+    {
+        BlazrEditStateStore? store = null;
+        if (editContext.Properties.TryGetValue(EditStateStoreName, out object? value))
+            store = value as BlazrEditStateStore;
+
+        return store;
+    }
+
+    public static bool TryGetStateStore(this EditContext editContext, [NotNullWhen(true)] out BlazrEditStateStore? store)
+    {
+        store = null;
+        if (editContext.Properties.TryGetValue(EditStateStoreName, out object? value))
+            store = value as BlazrEditStateStore;
+
+        return store is not null;
+    }
+
+    public static bool IsFieldValid(this EditContext editContext, FieldIdentifier? fieldIdentifier)
+    {
+        var messages = editContext.GetValidationMessages(fieldIdentifier ?? new());
+        return messages is null || messages.Count() == 0;
+    }
+
+    public static bool IsFieldValid(this EditContext editContext, Expression<Func<string>>? expression)
+    {
+        if (TryGetFieldIdentifier(expression, out var fieldIdentifier))
+            return editContext.GetValidationMessages(fieldIdentifier ?? new()) is null;
+
+        return false;
+    }
+    private static bool TryGetFieldIdentifier(Expression<Func<string>>? expression, [NotNullWhen(true)] out FieldIdentifier? fi)
+    {
+        fi = null;
+        if (expression is null)
+            return false;
+
+        fi = FieldIdentifier.Create(expression);
+        return fi is not null;
+    }
+}
+```
+
 ## The Edit Form
 
 This is a very standard edit form.  Note:
 
-1. The `EditStateTracker` component added to the `EditForm`.
-2. Tracking edit state through  `EditStateChanged` on `EditStateTracker` and using it to change the state of the buttons.
+1. The `BlazrEditStateTracker` component added to the `EditForm`.
+2. Tracking edit state through  `EditStateChanged` on `BlazrEditStateTracker` and using it to change the state of the buttons.
 3. Validation is included to show it works.
 4. There's a mock save to demostrate how to implement it.
+5. There's a mock `DoSomething` to show how to access the `BlazrEditStateStore` through the `EditContext`.
 
-```html
+```csharp
 @page "/"
 
 <PageTitle>Index</PageTitle>
 
 <EditForm EditContext=_editContext>
     <DataAnnotationsValidator />
-    <EditStateTracker @ref=_editStateTracker EditStateChanged=this.OnEditStateChanged LockNavigation=true />
+    <BlazrEditStateTracker EditStateChanged=this.OnEditStateChanged LockNavigation=true />
 
     <div class="mb-3">
         <label class="form-label">Date</label>
@@ -345,7 +437,6 @@ This is a very standard edit form.  Note:
 </div>
 
 @code {
-    private EditStateTracker? _editStateTracker;
     private bool _isDirty;
     private WeatherForecast model = new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
     private EditContext? _editContext;
@@ -356,8 +447,23 @@ This is a very standard edit form.  Note:
     private void OnEditStateChanged(bool isDirty)
         => _isDirty = isDirty;
 
+    private void DoSomething()
+    {
+        // Demonstrates how to get a reference to the current BlazrEditStateStore
+        if (_editContext is not null && _editContext.TryGetStateStore(out BlazrEditStateStore? editStateStore))
+        {
+            var dirty = editStateStore.IsDirty();
+        }
+    }
+
     private async Task SaveAsync()
     {
+        // Demonstrates how to get a reference to the current BlazrEditStateStore
+        if (_editContext is not null && _editContext.TryGetStateStore(out BlazrEditStateStore? editStateStore))
+        {
+            var dirty = editStateStore.IsDirty();   
+        }
+
         if (_editContext?.Validate() ?? false)
         {
             // mock an async call to the data pipeline to save the record

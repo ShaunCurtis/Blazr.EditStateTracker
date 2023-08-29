@@ -1,6 +1,4 @@
-using System.ComponentModel.DataAnnotations;
-
-namespace Blazr.EditStateTracker.Data;
+namespace Blazr.Server.Web.Data;
 
 public class WeatherForecast
 {

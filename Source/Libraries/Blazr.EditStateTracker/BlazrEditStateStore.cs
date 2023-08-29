@@ -1,15 +1,18 @@
-﻿using Microsoft.AspNetCore.Components.Forms;
+﻿/// ============================================================
+/// Author: Shaun Curtis, Cold Elm Coders
+/// License: Use And Donate
+/// If you use it, donate something to a charity somewhere
+/// ============================================================
+namespace Blazr.EditStateTracker;
 
-namespace Blazr.EditStateTracker.Data;
-
-public class EditStateStore
+public class BlazrEditStateStore
 {
     private object _model = new();
 
     private List<EditStateProperty> _properties = new();
     private EditContext _editContext;
 
-    public EditStateStore(EditContext context)
+    public BlazrEditStateStore(EditContext context)
     {
         _editContext = context;
         _model = context.Model;
@@ -42,29 +45,18 @@ public class EditStateStore
         }
     }
 
-    public bool IsDirty(string fieldName)
-        => _properties.FirstOrDefault(item => item.Name.Equals(fieldName))?.IsDirty ?? false;
-    
-    public bool IsDirty()
-        => _properties.Any(item => item.IsDirty);
-}
-
-
-public class EditStateProperty
-{
-    public string Name { get; private set; }
-    public object? BaseValue { get; private set; }
-    public object? CurrentValue { get; private set; }
-
-    public EditStateProperty(string name, object? value)
+    public void Reset()
     {
-        Name = name;
-        BaseValue = value;
-        CurrentValue= value;
+        foreach (var prop in _properties)
+        {
+            prop.Reset();
+            _editContext.MarkAsUnmodified(new(_editContext, prop.Name));
+        }
     }
 
-    public void Set(object? value)
-        => CurrentValue = value;
+    public bool IsDirty(string fieldName)
+        => _properties.FirstOrDefault(item => item.Name.Equals(fieldName))?.IsDirty ?? false;
 
-    public bool IsDirty => !BaseValue?.Equals(CurrentValue) ?? CurrentValue is not null;
+    public bool IsDirty()
+        => _properties.Any(item => item.IsDirty);
 }

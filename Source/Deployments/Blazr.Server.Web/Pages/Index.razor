@@ -4,7 +4,7 @@
 
 <EditForm EditContext=_editContext>
     <DataAnnotationsValidator />
-    <EditStateTracker @ref=_editStateTracker EditStateChanged=this.OnEditStateChanged LockNavigation=true />
+    <BlazrEditStateTracker EditStateChanged=this.OnEditStateChanged LockNavigation=true />
 
     <div class="mb-3">
         <label class="form-label">Date</label>
@@ -46,7 +46,6 @@
 </div>
 
 @code {
-    private EditStateTracker? _editStateTracker;
     private bool _isDirty;
     private WeatherForecast model = new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
     private EditContext? _editContext;
@@ -57,8 +56,23 @@
     private void OnEditStateChanged(bool isDirty)
         => _isDirty = isDirty;
 
+    private void DoSomething()
+    {
+        // Demonstrates how to get a reference to the current BlazrEditStateStore
+        if (_editContext is not null && _editContext.TryGetStateStore(out BlazrEditStateStore? editStateStore))
+        {
+            var dirty = editStateStore.IsDirty();
+        }
+    }
+
     private async Task SaveAsync()
     {
+        // Demonstrates how to get a reference to the current BlazrEditStateStore
+        if (_editContext is not null && _editContext.TryGetStateStore(out BlazrEditStateStore? editStateStore))
+        {
+            var dirty = editStateStore.IsDirty();   
+        }
+
         if (_editContext?.Validate() ?? false)
         {
             // mock an async call to the data pipeline to save the record
