@@ -6,6 +6,7 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9A63A41E-A493-4959-A160-0F29927F07E3}"
 	ProjectSection(SolutionItems) = preProject
 		readme.md = readme.md
+		Versions.md = Versions.md
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Libraries", "Libraries", "{92F8C607-3593-4833-965E-98ABC672510E}"
@@ -14,7 +15,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Deployments", "Deployments"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.Server.Web", "Source\Deployments\Blazr.Server.Web\Blazr.Server.Web.csproj", "{6EC8F03C-3BC5-48E7-8D05-FD7AF2BC1716}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Blazr.EditStateTracker", "source\libraries\Blazr.EditStateTracker\Blazr.EditStateTracker.csproj", "{D7DB2B99-33F8-4AEA-8D62-2FBB58298FDA}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Blazr.EditStateTracker", "source\libraries\Blazr.EditStateTracker\Blazr.EditStateTracker.csproj", "{D7DB2B99-33F8-4AEA-8D62-2FBB58298FDA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

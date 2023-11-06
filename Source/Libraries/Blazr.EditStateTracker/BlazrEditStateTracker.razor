@@ -10,7 +10,6 @@
 @code {
     [CascadingParameter] private EditContext _editContext { get; set; } = default!;
     [Parameter] public bool LockNavigation { get; set; }
-    [Parameter] public EventCallback<bool> EditStateChanged { get; set; }
 
     private BlazrEditStateStore _store = default!;
     private bool _currentIsDirty = false;
@@ -38,10 +37,8 @@
         _store.Update(e);
 
         if (_isDirty != _currentIsDirty)
-        {
             _currentIsDirty = _isDirty;
-            this.EditStateChanged.InvokeAsync(_isDirty);
-        }
+
         this.StateHasChanged();
     }
 
