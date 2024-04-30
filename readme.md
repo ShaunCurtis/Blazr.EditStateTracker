@@ -124,6 +124,8 @@ A fourth object is implemented in the *Blazr.Core* library.
 
 1. `TrackStateAttribute` - a custom attribute to identify properties to track.
 
+It uses a `WeatherForecastEditContext` object to edit a `WeatherForecast`.  This separates out editing from the data object.
+
 ### TrackState
 
 The custom attribute to identify tracked properties.  It does nothing more that identifies the properties to track.
@@ -132,15 +134,16 @@ The custom attribute to identify tracked properties.  It does nothing more that 
 public class TrackStateAttribute : Attribute {}
 ```
 
-Applied to `WeatherForecast`:
+Applied to `WeatherForecastEditContext`:
 
 ```csharp
-public class WeatherForecast
+public class WeatherForecastEditContext
 {
     [TrackState] public DateOnly Date { get; set; }
     [TrackState] public int TemperatureC { get; set; }
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-    [TrackState] [Required] public string? Summary { get; set; }
+    [TrackState, Required] public string? Summary { get; set; }
+
+    //...
 }
 ```
 
@@ -256,8 +259,6 @@ The component:
 
 `LockNavigation` enables/disables navigation locking.  The UI adds the `NavigationLock` component and wires it up if required.
 
-`OnLocationChanged` is the callback handler for `NavigationLock` and prevents navigation when the form is dirty.
-
 > Note: `BlazrEditStateTracker` inherits from `BlazrControlBase`.  This component is part of the `Blazr.BaseComponents` Nuget library.
 
 ```csharp
@@ -273,7 +274,6 @@ The component:
 @code {
     [CascadingParameter] private EditContext _editContext { get; set; } = default!;
     [Parameter] public bool LockNavigation { get; set; }
-    [Parameter] public EventCallback<bool> EditStateChanged { get; set; }
 
     public const string EditStateStoreName = "EditStateStore";
 
@@ -298,17 +298,15 @@ The component:
         return Task.CompletedTask;
     }
 
-    private void OnFieldChanged(object? sender, FieldChangedEventArgs e)
-    {
-        _store.Update(e);
+   private void OnFieldChanged(object? sender, FieldChangedEventArgs e)
+   {
+       _store.Update(e);
 
-        if (_isDirty != _currentIsDirty)
-        {
-            _currentIsDirty = _isDirty;
-            this.EditStateChanged.InvokeAsync(_isDirty);
-        }
-        this.StateHasChanged();
-    }
+       if (_isDirty != _currentIsDirty)
+           _currentIsDirty = _isDirty;
+
+       this.StateHasChanged();
+   }
 
     private void OnLocationChanged(LocationChangingContext context)
     {
@@ -384,37 +382,44 @@ public static class BlazrEditContextExtensions
 
 ## The Edit Form
 
-This is a very standard edit form.  Note:
+This is a typical edit form.  Note:
 
 1. The `BlazrEditStateTracker` component added to the `EditForm`.
-2. Tracking edit state through  `EditStateChanged` on `BlazrEditStateTracker` and using it to change the state of the buttons.
-3. Validation is included to show it works.
-4. There's a mock save to demostrate how to implement it.
-5. There's a mock `DoSomething` to show how to access the `BlazrEditStateStore` through the `EditContext`.
+1. Getting the `BlazrEditStateStore` from the EditContext.
+1. Tracking edit state through  the `BlazrEditStateStore` instance.
+1. Validation is included to show it works.
+1. There's a mock save to demostrate how to implement it.
+1. The `NavigationManager` and `NavigationLock` implementation to control navigation.
+1. The Exit button change when the form is dirty and the use of the standard browser confirm dialog to confirm exit.
 
 ```csharp
 @page "/"
+@inject NavigationManager NavManager
+@inject IJSRuntime Js
+@implements IDisposable
 
 <PageTitle>Index</PageTitle>
 
+<Alert @bind-Message="_alertMessage" />
+
 <EditForm EditContext=_editContext>
     <DataAnnotationsValidator />
-    <BlazrEditStateTracker EditStateChanged=this.OnEditStateChanged LockNavigation=true />
+    <BlazrEditStateTracker />
 
     <div class="mb-3">
         <label class="form-label">Date</label>
-        <InputDate class="form-control" @bind-Value=this.model.Date />
+        <InputDate class="form-control" @bind-Value=_model.Date />
     </div>
 
     <div class="mb-3">
         <label class="form-label">Temperature &deg;C</label>
-        <InputNumber class="form-control" @bind-Value=this.model.TemperatureC />
+        <InputNumber class="form-control" @bind-Value=_model.TemperatureC />
     </div>
 
     <div class="mb-3">
         <label class="form-label">Summary</label>
-        <InputSelect class="form-select" @bind-Value=this.model.Summary>
-            @if (this.model.Summary is null)
+        <InputSelect class="form-select" @bind-Value=_model.Summary>
+            @if (_model.Summary is null)
             {
                 <option disabled selected value=""> -- Choose a Summary --</option>
             }
@@ -423,61 +428,97 @@ This is a very standard edit form.  Note:
                 <option value="@summary">@summary</option>
             }
         </InputSelect>
-        <ValidationMessage For="() => this.model.Summary" />
+        <ValidationMessage For="() => _model.Summary" />
     </div>
 
     <div class="mb-3 text-end">
-        <button disabled="@(!_isDirty)" type="button" class="btn btn-success" @onclick=this.SaveAsync>Submit</button>
-        <button disabled="@(_isDirty)" type="button" class="btn btn-dark">Exit</button>
+        <button disabled="@_isClean" type="button" class="btn btn-success" @onclick="this.SaveAsync">Submit</button>
+        <button hidden="@_isDirty" type="button" class="btn btn-dark" @onclick="this.Exit">Exit</button>
+        <button hidden="@_isClean" type="button" class="btn btn-danger" @onclick="this.ExitWithoutSave">Exit without Saving</button>
     </div>
 
 </EditForm>
 
+<NavigationLock ConfirmExternalNavigation=_isDirty />
+
+
 <div class="bg-dark text-white m-4 p-2">
-    <pre>Date : @this.model.Date</pre>
-    <pre>Temperature &deg;C : @this.model.TemperatureC</pre>
-    <pre>Summary: @this.model.Summary</pre>
+    <pre>Date : @_model.Date</pre>
+    <pre>Temperature &deg;C : @_model.TemperatureC</pre>
+    <pre>Summary: @_model.Summary</pre>
     <pre>State: @(_isDirty ? "Dirty" : "Clean")</pre>
 </div>
 
 @code {
-    private bool _isDirty;
-    private WeatherForecast model = new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 };
+    private WeatherForecastEditContext _model = new(new() { Date = DateOnly.FromDateTime(DateTime.Now), TemperatureC = 10 });
     private EditContext? _editContext;
+    private BlazrEditStateStore? _editStateStore => _editContext?.GetStateStore();
+    private bool _isDirty => _editStateStore?.IsDirty() ?? false;
+    private bool _isClean => !_isDirty;
+    private IDisposable? _disposeMe;
 
     protected override void OnInitialized()
-        => _editContext = new EditContext(model);
-
-    private void OnEditStateChanged(bool isDirty)
-        => _isDirty = isDirty;
-
-    private void DoSomething()
     {
-        // Demonstrates how to get a reference to the current BlazrEditStateStore
-        if (_editContext is not null && _editContext.TryGetStateStore(out BlazrEditStateStore? editStateStore))
-        {
-            var dirty = editStateStore.IsDirty();
-        }
+        // Sets up the Edit Context
+        _editContext = new EditContext(_model);
+
+        // set up the handler to handle attempted navigation events 
+        _disposeMe = this.NavManager.RegisterLocationChangingHandler(this.OnLocationChanging);
+    }
+
+    private ValueTask OnLocationChanging(LocationChangingContext context)
+    {
+        // Prevent navigation if the edit context is dirty
+        if (_isDirty)
+            context.PreventNavigation();
+
+        return ValueTask.CompletedTask;
     }
 
     private async Task SaveAsync()
     {
-        // Demonstrates how to get a reference to the current BlazrEditStateStore
-        if (_editContext is not null && _editContext.TryGetStateStore(out BlazrEditStateStore? editStateStore))
-        {
-            var dirty = editStateStore.IsDirty();   
-        }
+        // If the edit context isn't dirty, then there's nothing to do
+        if (!_isDirty)
+            return;
 
+        // Validate the form
         if (_editContext?.Validate() ?? false)
         {
             // mock an async call to the data pipeline to save the record
+            var updatedRecord = _model.AsRecord;
             await Task.Delay(100);
             // Error handling code here
 
-            // This will reset the edit context and the EditStateTracker
-            _editContext = new EditContext(model);
-            _isDirty = false;
+            // This will reset the edit contexts and the EditStateTracker
+            _model = new(updatedRecord);
+            _editContext = new EditContext(_model);
         }
+    }
+
+    private void Exit()
+    {
+        // Belt and braces check before exiting
+        if (_isClean)
+            this.NavManager.NavigateTo("/counter");
+    }
+
+    private async Task ExitWithoutSave()
+    {
+        // Confirm with a Js Confirm popup
+        bool confirmed = await Js.InvokeAsync<bool>("confirm", "Are you sure you want to exit without saving?");
+
+        if (confirmed)
+        {
+            // Reset the EditStateStore - it will now be clean, so we can exit
+            _editStateStore?.Reset();
+            this.NavManager.NavigateTo("/counter");
+        }
+    }
+
+    public void Dispose()
+    {
+        // dispose the RegisterLocationChangingHandler correctly
+        _disposeMe?.Dispose();
     }
 
     private List<string> Summaries = new() { "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching" };

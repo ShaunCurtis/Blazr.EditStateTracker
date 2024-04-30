@@ -1,0 +1,34 @@
+﻿
+<div class="@_css" role="alert">
+    @this.Message
+    <button type="button" class="btn-close" @onclick="this.ClearMessage"></button>
+</div>
+
+@code {
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public EventCallback<string?> MessageChanged { get; set; }
+    [Parameter] public AlertType TypeOfAlert { get; set; } = Alert.AlertType.Warning;
+
+    private string _css => Message is null
+        ? $"alert {_alertTypeCss} alert-dismissible fade"
+        : $"alert {_alertTypeCss} alert-dismissible fade show";
+
+    public void ClearMessage()
+        => this.MessageChanged.InvokeAsync();
+
+    public enum AlertType
+    {
+        Success,
+        Warning,
+        Danger,
+        Info
+    }
+
+    private string _alertTypeCss => this.TypeOfAlert switch
+    {
+        AlertType.Success => "alert=success",
+        AlertType.Danger => "alert-danger",
+        AlertType.Warning => "alert-warning",
+        _ => "alert-info"
+    };
+}
