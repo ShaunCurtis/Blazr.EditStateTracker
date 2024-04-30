@@ -14,9 +14,9 @@
 		<RepositoryUrl>https://github.com/ShaunCurtis/Blazr.EditStateTracker</RepositoryUrl>
 		<PackageReleaseNotes>Version 1 Updates</PackageReleaseNotes>
 		<PackageLicenseFile>license.txt</PackageLicenseFile>
-		<AssemblyVersion>1.0.1</AssemblyVersion>
-		<FileVersion>1.0.1</FileVersion>
-		<Version>1.0.1</Version>
+		<AssemblyVersion>1.2.0</AssemblyVersion>
+		<FileVersion>1.2.0</FileVersion>
+		<Version>1.2.0</Version>
 	</PropertyGroup>
 
 
@@ -25,9 +25,9 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Blazr.BaseComponents" Version="1.0.0" />
-		<PackageReference Include="Blazr.Core" Version="1.0.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.3" />
+		<PackageReference Include="Blazr.BaseComponents" Version="1.0.1" />
+		<PackageReference Include="Blazr.Core" Version="1.0.2" />
+		<PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="8.0.4" />
 	</ItemGroup>
 
 	<ItemGroup>
