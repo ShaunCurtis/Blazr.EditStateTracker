@@ -188,6 +188,8 @@ public class BlazrEditStateStore
     private List<EditStateProperty> _properties = new();
     private EditContext _editContext;
 
+    public event EventHandler<FieldChangedEventArgs>? StoreUpdated;
+
     public BlazrEditStateStore(EditContext context)
     {
         _editContext = context;
@@ -217,6 +219,8 @@ public class BlazrEditStateStore
                 // If the value is clean clear out the modified setting in the Edit Context
                 if (!IsDirty(e.FieldIdentifier.FieldName))
                     _editContext.MarkAsUnmodified(e.FieldIdentifier);
+
+                this.StoreUpdated?.Invoke(this, e);
             }
         }
     }
